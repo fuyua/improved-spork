@@ -1,0 +1,82 @@
+#!/usr/bin/python
+import sys
+sys.path.append('/opt/galamost3/lib')
+import galamost
+from optparse import OptionParser
+import molgen
+import random
+num_rand = random.randint(0,100000)
+lx_s =100
+ly_s = 10
+lz_s = 10
+radius_t = 1.5
+global _options
+parser = OptionParser()
+parser.add_option('--gpu', dest = 'gpu',help = 'GPU on which to execute')
+(_options, args)= parser.parse_args()
+
+filename='chian.xml'
+build_method = galamost.XmlReader(filename)
+perform_config = galamost.PerformConfig( _options.gpu)
+all_info = galamost.AllInfo(build_method, perform_config)
+
+dt=0.001
+app = galamost.Application(all_info, dt)
+
+neighbor_list = galamost.NeighborList(all_info, 1.0,0.05)
+dpd = galamost.DpdForce(all_info, neighbor_list, 1.0, num_rand)
+dpd.setParams('A','A',25.0,3.0)
+dpd.setParams('water','water',10.0,3.0)
+dpd.setParams('A','water',75.0,3.0)
+app.add(dpd)
+
+
+groupA=galamost.ParticleSet(all_info,'A')
+group_water = galamost.ParticleSet(all_info,'water')
+group_Awater = galamost.ParticleSet.combine(groupA,group_water)
+bbc = galamost.BounceBackConstrain(all_info, group_Awater)
+bbc.addCylinder(0,0,0,1,0,0,radius_t)
+bbc.addWall(-lx_s,0,0,1,0,0)
+bbc.addWall(lx_s,0,0,1,0,0)
+app.add(bbc)
+ljc = galamost.LjConstrainForce(all_info, group_Awater,1.0)
+#ljc.setParams(ljc,100,group_Awater,1.0,1.0,1.0)
+ljc.addCylinder(0,0,0,1,0,0,radius_t)
+#ljc.addWall(-6,0,0,1,0,0)
+#ljc.addWall(-200,0,0,1,0,0)
+#ljc.addWall(200,0,0,-1,0,0)
+app.add(ljc)
+
+bondforce =galamost.BondForceHarmonic(all_info)
+bondforce.setParams('A-A',200,0.0)
+app.add(bondforce)
+
+Gwvv = galamost.DpdGwvv(all_info, group_Awater)
+app.add(Gwvv)
+
+sort_method = galamost.Sort(all_info)
+sort_method.setPeriod(100)
+app.add(sort_method)
+
+comp_info = galamost.ComputeInfo(all_info,groupA)
+dInfo = galamost.DumpInfo(all_info,comp_info,'data.log')
+dInfo.setPeriod(5000)
+app.add(dInfo)
+comp_info1 = galamost.ComputeInfo(all_info,group_Awater)
+dInfo1 = galamost.DumpInfo(all_info,comp_info1,'data_all.log')
+dInfo1.setPeriod(5000)
+app.add(dInfo1)
+
+
+mol2 = galamost.Mol2Dump(all_info, 'all_particles')
+mol2.setPeriod(10000)
+mol2.deleteBoundaryBond(True)
+app.add(mol2)
+
+xml = galamost.XmlDump(all_info, 'particles') # output the configuration files in xml format
+xml.setPeriod(5000)# (period)
+xml.setOutputBond(True)
+app.add(xml)
+app.run(50000)
+neighbor_list.printStats()
+

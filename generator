@@ -1,0 +1,35 @@
+#!/usr/bin/python
+import sys
+sys.path.append('/opt/galamost3/lib')
+import molgen
+lx=100
+ly=10
+lz=10
+radius_t = 1.5
+n_chain = 320
+density = 1000/(3.141592654*25*40)
+num_water = int(density*3.141592654*(radius_t-0.5)**2*(lx-10))
+mol1=molgen.Molecule(n_chain)
+mol1.setCylinder(0,0,0,1,0,0,0,4)
+mol1.setParticleTypes('A*320')
+s=""
+for i in range(n_chain-1):
+	s+="%s-%s," %(i,i+1)
+s=s[0:(len(s)-1)]
+
+mol1.setTopology(s)
+mol1.setBondLength(0.80)
+mol1.setMass(1.0)
+mol1.setBox(-(lx-10),lx-10,-ly,ly,-lz,lz)
+mol1.setCylinder(0,0,0,1,0,0,0,radius_t-0.5)
+
+mol2=molgen.Molecule(1)
+mol2.setParticleTypes('water')
+mol2.setCylinder(0,0,0,1,0,0,0,radius_t-0.5)
+
+
+gen=molgen.Generators(2*lx,2*ly,2*lz)
+gen.addMolecule(mol2,num_water)
+gen.addMolecule(mol1,1)
+gen.setMinimumDistance(0.75)
+gen.outPutXml('chian')
